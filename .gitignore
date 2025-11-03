@@ -1,0 +1,13 @@
+/.bsp/
+target/
+*.csv
+.idea/
+/.bloop/
+project/target/
+*.iml
+.bsp/
+*.log
+*.conf
+conf/
+target/streams/
+project/.bloop/
