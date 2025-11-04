@@ -6,9 +6,9 @@ import org.apache.spark.sql.functions._
 object Main {
   def main(args: Array[String]): Unit = {
 
-    // Reduce logs de Spark
     Logger.getLogger("org").setLevel(Level.WARN)
     Logger.getLogger("akka").setLevel(Level.WARN)
+
     val redis = RedisConfig
     val spark = SparkSession.builder()
       .appName("SparkRedisETL")
@@ -23,22 +23,44 @@ object Main {
       .option("inferSchema", "true")
       .csv("Online Retail.csv")
 
-    //val customer = df.filter("CustomerID = 17850").show(10)
-    //val fromUK = df.filter("Country = 'France'").show(10)
-    ///val mostExpensiveByCustomer = df.groupBy("CustomerID").max("UnitPrice").alias("highest unit price").show(10)
-
     val dfWithTimestamp = df.withColumn(
       "InvoiceDate",
       to_date(col("InvoiceDate"), "dd/MM/yyyy H:m")
     )
+    dfWithTimestamp.printSchema()
 
-    val dfSept2011 = dfWithTimestamp
-      .filter(year(col("ts")) === 2011)
-      .filter(month(col("ts")) === 9)
-      .select("CustomerID", "Description", "UnitPrice", "InvoiceDate" )
+    val dfSept2011 =    dfWithTimestamp
+      .filter(year(col("InvoiceDate")) === 2011)
+      .filter(month(col("InvoiceDate")) === 9)
+      .filter(col("CustomerID").isNotNull)
+      .withColumn(
+        "redisKey",
+          concat(
+          lit("customer:"),
+          col("CustomerID").cast("string"),
+          lit(":"),
+          date_format(col("InvoiceDate"), "yyyy-MM-dd")
+        )
+      )
+      .filter(col("redisKey").isNotNull)
+      .select("redisKey", "CustomerID", "Description", "UnitPrice", "InvoiceDate")
 
-    dfSept2011.show(5)
-    df.printSchema()
+    dfSept2011.printSchema()
+    dfSept2011.show(5, false)
+    println("NULL redisKeys: " + dfSept2011.filter(col("redisKey").isNull).count())
+
+    dfSept2011.write.format("org.apache.spark.sql.redis")
+      .option("table", "sept2011_purchases")
+      .option("key.column", "redisKey")
+      .mode("overwrite")      .save()
+
+    val dfFromRedis = spark.read.format("org.apache.spark.sql.redis")
+      .option("table", "sept2011_purchases")
+      .option("key.column", "redisKey")
+      .load()
+    println("|||||||||||||||")
+    dfFromRedis.show(5)
+
     spark.stop()
 
   }
