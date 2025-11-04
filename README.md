@@ -21,4 +21,4 @@ url = "redis://user:passwd@host:port"
 ```
 
 # API #
-You can find the API here [a link](https://github.com/AranaDeDoros/redis-etl-play-api).
+You can find the API  [here](https://github.com/AranaDeDoros/redis-etl-play-api).
